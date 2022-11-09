@@ -1,0 +1,30 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{BA737EB9-B48B-46F2-8133-86CC8454D4CC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Local.ReverseProxy", "src\Local.ReverseProxy\Local.ReverseProxy.csproj", "{9FEEC1F6-A56D-4DD6-887E-4782070D234A}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{9FEEC1F6-A56D-4DD6-887E-4782070D234A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9FEEC1F6-A56D-4DD6-887E-4782070D234A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9FEEC1F6-A56D-4DD6-887E-4782070D234A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9FEEC1F6-A56D-4DD6-887E-4782070D234A}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{9FEEC1F6-A56D-4DD6-887E-4782070D234A} = {BA737EB9-B48B-46F2-8133-86CC8454D4CC}
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {52286567-2ED9-481C-82B9-254D1BB55D1B}
+	EndGlobalSection
+EndGlobal
