@@ -76,6 +76,7 @@ $params = @{
     * goto `Manage user certificates -> Certificates - Current Users` 
     * goto `Personal -> Certificates`
     * Right click on the client/dns cetificate and follow the Wizard and  export with private key.
+    * Save as `localhost.pfx` in the `src\Local.ReverseProxy` folder and update the password in the ``appSettings.json`` file.
 
 
 #### More info
