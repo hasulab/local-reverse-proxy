@@ -20,6 +20,18 @@ $params = @{
 $cert = New-SelfSignedCertificate @params
 ```
 
+#### Export CA certificate
+    * goto `run` and type `certmgr.msc`
+    * goto `Manage user certificates -> Certificates - Current Users` 
+    * goto `Personal -> Certificates`
+    * Right click on the root cetificate and follow the Wizard and  export with private key.
+
+#### Imoprt root certificate to tursted root
+    * goto `Manage user certificates -> Certificates - Current Users`
+    * goto `Trusted Root Certification Authorities -> Certificates`
+    * right click on import and follow the Wizard
+    * seelct `Trusted Root Certification Authorities` where necessary.
+
 ### Generate a client certificate with localhost
 
 ```powershell
@@ -58,6 +70,13 @@ $params = @{
    }
    New-SelfSignedCertificate @params
 ```
+
+#### Export client/dns certificate
+    * goto `run` and type `certmgr.msc`
+    * goto `Manage user certificates -> Certificates - Current Users` 
+    * goto `Personal -> Certificates`
+    * Right click on the client/dns cetificate and follow the Wizard and  export with private key.
+
 
 #### More info
     * How to Generate and export certificates for point-to-site using PowerShell](https://learn.microsoft.com/en-us/azure/vpn-gateway/vpn-gateway-certificates-point-to-site)
