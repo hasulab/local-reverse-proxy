@@ -20,6 +20,23 @@ $params = @{
 $cert = New-SelfSignedCertificate @params
 ```
 
+or find root certificate by name
+```powershell
+ $certs = Get-ChildItem -path Cert:\* -Recurse | where {$_.Subject –like '*MyLocalhostRootCert*'}
+
+ $certs.Length
+ $cert = $certs[0]
+```
+
+or by thumbprint
+```powershell
+ $certs = Get-ChildItem -Path "Cert:\*<THUMBPRINT>" -Recurse
+
+ $certs.Length
+ $cert = $certs[0]
+```
+
+
 #### Export CA certificate
     * goto `run` and type `certmgr.msc`
     * goto `Manage user certificates -> Certificates - Current Users` 
