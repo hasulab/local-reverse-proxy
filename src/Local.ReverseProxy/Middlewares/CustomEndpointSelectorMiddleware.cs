@@ -30,7 +30,8 @@
                     var pathPrefix = refererUrlSegments[3] ?? string.Empty;
                     var selectedEndpoint = endpoints
                         .FirstOrDefault(e => e.DisplayName == pathPrefix 
-                                            || (e.Metadata.Count > 1 && e.Metadata[1].ToString().Contains($"/{pathPrefix}/") ));
+                                            || (e.Metadata.Count > 1 && e.Metadata.Any(x=> x.ToString().Contains($"/{pathPrefix}/"))));
+                    //endpoints[1].Metadata[1] as Microsoft.AspNetCore.Routing.RouteEndpointBuilder.RouteDiagnosticsMetadata
                     if (selectedEndpoint != null)
                     {
                         context.SetEndpoint(selectedEndpoint);
