@@ -1,4 +1,5 @@
-﻿using Microsoft.IdentityModel.Tokens;
+﻿using Local.ReverseProxy.Models;
+using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -9,27 +10,37 @@ namespace Local.ReverseProxy.Middlewares
     {
         private readonly RequestDelegate _next;
         private readonly IConfiguration _configuration;
+        private readonly AuthenticationConfig _authentication;
         private static SecurityKey _cachedSigningKey;
         private static DateTime _lastKeyFetch = DateTime.MinValue;
 
-        public JwtValidationMiddleware(RequestDelegate next, IConfiguration configuration)
+        public JwtValidationMiddleware(RequestDelegate next, 
+            IConfiguration configuration, AuthenticationConfig authentication)
         {
             _next = next;
             _configuration = configuration;
+            _authentication = authentication;
         }
 
         public async Task Invoke(HttpContext context)
         {
+            var endpoint = context.GetEndpoint();
+            if (_authentication.AuthExlusions.Contains(endpoint.DisplayName))
+            {
+                await _next(context);
+                return;
+            }
+
             var token = context.Request.Headers["Authorization"].FirstOrDefault()?.Split(" ").Last();
             var validationResult = await ValidateTokenAsync(token);
             if (validationResult.isValid)
             {
-                context.User = validationResult.principal;
+                context.User = validationResult.principal!;
             }
             else
             {
                 context.Response.StatusCode = 401;
-                await context.Response.WriteAsync("Invalid or missing token.");
+                await context.Response.WriteAsync($"Invalid or missing token for {endpoint.DisplayName}");
                 return;
             }
 

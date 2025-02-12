@@ -1,9 +1,15 @@
 using Local.ReverseProxy.Middlewares;
+using Local.ReverseProxy.Models;
 using Local.ReverseProxy.Transforms;
 using Microsoft.AspNetCore.Routing.Matching;
 
 var builder = WebApplication.CreateBuilder(args);
 //builder.Services.AddSingleton<EndpointSelector, CustomEndpointSelector>();
+builder.Services.Configure<AuthenticationConfig>(
+    builder.Configuration.GetSection("Authentication"));
+
+builder.Services.AddSingleton(ConfigurationBinder.Get<AuthenticationConfig>(builder.Configuration.GetSection("Authentication")));
+
 builder.Services.AddReverseProxy()
     .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"))
      .AddTransforms(builderContext =>
@@ -16,6 +22,7 @@ builder.Services.AddReverseProxy()
 var app = builder.Build();
 
 app.UseMiddleware<CustomEndpointSelectorMiddleware>();
+app.UseMiddleware<JwtValidationMiddleware>();
 app.Use(async (context, next) =>
 {
     var endpoint = context.GetEndpoint();
