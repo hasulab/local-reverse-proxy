@@ -58,3 +58,6 @@ public class CustomEndpointSelector : EndpointSelector
         return Task.CompletedTask;
     }
 }
+
+
+public partial class Program { }
