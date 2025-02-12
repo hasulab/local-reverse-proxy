@@ -5,9 +5,8 @@ using Microsoft.AspNetCore.Routing.Matching;
 
 var builder = WebApplication.CreateBuilder(args);
 //builder.Services.AddSingleton<EndpointSelector, CustomEndpointSelector>();
-builder.Services.Configure<AuthenticationConfig>(
-    builder.Configuration.GetSection("Authentication"));
-
+builder.Services.Configure<AuthenticationConfig>(builder.Configuration.GetSection("Authentication"));
+//builder.Environment.EnvironmentName = "Development";
 builder.Services.AddSingleton(ConfigurationBinder.Get<AuthenticationConfig>(builder.Configuration.GetSection("Authentication")));
 
 builder.Services.AddReverseProxy()
