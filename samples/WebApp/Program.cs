@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http.Features.Authentication;
+using Microsoft.Identity.Web;
 using Microsoft.IdentityModel.Tokens;
 using WebApp;
 
@@ -12,6 +13,13 @@ var clientId = builder.Configuration["Authentication:AzureAd:ClientId"];
 
 //https://stackoverflow.com/questions/74196824/idx10511-signature-validation-failed-keys-tried-microsoft-identitymodel-toke
 //https://github.com/AzureAD/azure-activedirectory-identitymodel-extensions-for-dotnet/issues/1334
+
+//olny for web
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddMicrosoftIdentityWebApi(builder.Configuration, configSectionName: "Authentication:AzureAd");
+
+//only for console/webapis
+/*
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -32,7 +40,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true //true
         };
     });
-
+*/
 
 builder.Services.Configure<AuthenticationConfig>(builder.Configuration.GetSection("Authentication"))
     .AddSingleton(ConfigurationBinder.Get<AuthenticationConfig>(builder.Configuration.GetSection("Authentication")))
