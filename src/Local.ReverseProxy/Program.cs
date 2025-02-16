@@ -1,6 +1,7 @@
 using Local.ReverseProxy.Middlewares;
 using Local.ReverseProxy.Models;
 using Local.ReverseProxy.Transforms;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Routing.Matching;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -16,12 +17,34 @@ builder.Services.AddReverseProxy()
      //builderContext.Add(new WSToJsonTransformer());
      //https://microsoft.github.io/reverse-proxy/articles/transforms.html         
      });
+var tenantId = builder.Configuration["Authentication:AzureAd:TenantId"];
+var clientId = builder.Configuration["Authentication:AzureAd:ClientId"];
 
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        options.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+        options.Audience = $"{clientId}"; // Your Azure AD Application ID
+
+        options.TokenValidationParameters = new Microsoft.IdentityModel.Tokens.TokenValidationParameters
+        {
+            ValidateIssuer = true,
+            ValidateAudience = true,
+            ValidateLifetime = true,
+            ValidIssuer = $"https://login.microsoftonline.com/{tenantId}/v2.0",
+            ValidAudience = $"{clientId}"
+        };
+    });
+
+builder.Services.AddAuthorization();
 
 var app = builder.Build();
 
+app.UseAuthentication();
+app.UseAuthorization();
+
 app.UseMiddleware<CustomEndpointSelectorMiddleware>();
-app.UseMiddleware<JwtValidationMiddleware>();
+//app.UseMiddleware<JwtValidationMiddleware>();
 app.Use(async (context, next) =>
 {
     var endpoint = context.GetEndpoint();
