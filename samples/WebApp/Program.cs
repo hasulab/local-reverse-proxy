@@ -42,6 +42,31 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 */
 
+//builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+//   .AddMicrosoftIdentityWebApi(options =>
+//       {
+//           var config = builder.Services.BuildServiceProvider().GetService<AuthenticationConfig>();
+
+//           options.Authority = $"https://login.microsoftonline.com/{tenantId}/v2.0";
+//           options.Audience = $"api://{clientId}";// "https://graph.microsoft.com"; // $"{clientId}";
+//           options.RequireHttpsMetadata = true;
+//           options.IncludeErrorDetails = true;
+//           options.TokenValidationParameters = new TokenValidationParameters
+//           {
+//               ValidateIssuer = true,
+//               ValidIssuer = $"https://sts.windows.net/{tenantId}/", // $"https://login.microsoftonline.com/{tenantId}/v2.0",
+//               ValidateAudience = true,
+//               ValidAudience = $"api://{clientId}",
+//               ValidateLifetime = true,
+//               RequireSignedTokens = true, // true,
+//               ValidateIssuerSigningKey = true //true
+//           };
+//       },
+//       msiOption =>
+//       {
+//           msiOption.ClientId = clientId;
+//       });
+
 builder.Services.Configure<AuthenticationConfig>(builder.Configuration.GetSection("Authentication"))
     .AddSingleton(ConfigurationBinder.Get<AuthenticationConfig>(builder.Configuration.GetSection("Authentication")))
     .AddAuthorization()
