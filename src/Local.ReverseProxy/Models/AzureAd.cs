@@ -9,5 +9,7 @@
         public string CallbackPath { get; set; }
         public string ClientSecret { get; set; }
         public string Audience { get; set; }
+        public string[] Audiences { get; set; }
+        public string Issuer { get; set; }
     }
 }
