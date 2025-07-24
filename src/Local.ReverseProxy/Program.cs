@@ -1,3 +1,4 @@
+using Local.ReverseProxy.Extensions;
 using Local.ReverseProxy.Middlewares;
 using Local.ReverseProxy.Models;
 using Local.ReverseProxy.Services;
@@ -46,8 +47,10 @@ var app = builder.Build();
 app.UseAuthentication();
 app.UseAuthorization();
 
-app.UseMiddleware<CustomEndpointSelectorMiddleware>();
-//app.UseMiddleware<JwtValidationMiddleware>();
+
+app.UseHttpFileMiddleware(builder.Configuration["HttpFilesBasePath"] ?? ".\\HttpFiles");
+app.UseProxyMiddleware(); 
+    
 app.Use(async (context, next) =>
 {
     var endpoint = context.GetEndpoint();
