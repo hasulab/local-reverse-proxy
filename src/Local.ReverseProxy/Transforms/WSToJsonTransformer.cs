@@ -1,5 +1,4 @@
 ﻿using System.Text;
-using System.Threading;
 using Yarp.ReverseProxy.Forwarder;
 
 namespace Local.ReverseProxy.Transforms
@@ -31,8 +30,7 @@ namespace Local.ReverseProxy.Transforms
                 proxyRequest.Content = new StringContent(newBody, Encoding.UTF8, httpContext.Request.ContentType);
             }
         }
-
-        
+       
         public override async ValueTask<bool> TransformResponseAsync(HttpContext httpContext, HttpResponseMessage? proxyResponse, CancellationToken cancellationToken)
         {
             // Log response headers

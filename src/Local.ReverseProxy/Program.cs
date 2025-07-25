@@ -2,9 +2,7 @@ using Local.ReverseProxy.Extensions;
 using Local.ReverseProxy.Middlewares;
 using Local.ReverseProxy.Models;
 using Local.ReverseProxy.Services;
-using Local.ReverseProxy.Transforms;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Routing.Matching;
 
 var builder = WebApplication.CreateBuilder(args);
 //builder.Services.AddSingleton<EndpointSelector, CustomEndpointSelector>();
@@ -41,6 +39,7 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
+builder.Services.AddHttpFile();
 
 var app = builder.Build();
 
@@ -65,28 +64,5 @@ app.UseMiddleware<RequestResponseLoggingMiddleware>();
 app.MapGet("/", () => "Hello World!");
 app.MapReverseProxy();
 app.Run();
-
-
-public class CustomEndpointSelector : EndpointSelector
-{
-    public override Task SelectAsync(HttpContext httpContext, CandidateSet candidates)
-    {
-        for (int i = 0; i < candidates.Count; i++)
-        {
-            var endpoint = candidates[i].Endpoint;
-            if (endpoint.DisplayName == "SpecialEndpoint")
-            {
-                candidates.SetValidity(i, true);
-            }
-            else
-            {
-                candidates.SetValidity(i, false);
-            }
-        }
-
-        return Task.CompletedTask;
-    }
-}
-
 
 public partial class Program { }
