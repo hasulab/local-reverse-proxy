@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using Local.ReverseProxy.Services;
+using System.Text.RegularExpressions;
 
 namespace Local.ReverseProxy.Middlewares
 {
@@ -6,11 +7,14 @@ namespace Local.ReverseProxy.Middlewares
     {
         private readonly RequestDelegate _next;
         private readonly string _basePath;
+        private readonly IHttpFileService _httpFileService;
 
-        public HttpFileMiddleware(RequestDelegate next, string basePath)
+        public HttpFileMiddleware(RequestDelegate next, string basePath, 
+            IHttpFileService httpFileService)
         {
             _next = next;
             _basePath = basePath; // e.g., "C:\\HttpFiles" or "/var/www/httpfiles"
+            _httpFileService = httpFileService;
         }
 
         public async Task InvokeAsync(HttpContext context)
@@ -20,23 +24,29 @@ namespace Local.ReverseProxy.Middlewares
             // You might want more sophisticated routing.
             var filePath = Path.Combine(_basePath, context.Request.Path.Value.TrimStart('/') + ".http");
 
-            if (File.Exists(filePath))
+            if (_httpFileService.Exists(filePath))
             {
                 try
                 {
-                    var fileContent = await File.ReadAllTextAsync(filePath);
-                    var (statusCode, headers, body) = ParseHttpFile(fileContent);
+                    var httpFiiles = await _httpFileService.ParseHttpFile(filePath);
+                    var httpFiile = httpFiiles?.FirstOrDefault(x => x.Method == context.Request.Method);
+                    if (httpFiile == null)
+                    {
+                        context.Response.StatusCode = StatusCodes.Status404NotFound;
+                        await context.Response.WriteAsync("No matching .http file found.");
+                        return;
+                    }
 
-                    context.Response.StatusCode = statusCode;
+                    context.Response.StatusCode = httpFiile.StatusCode;
 
-                    foreach (var header in headers)
+                    foreach (var header in httpFiile.Headers)
                     {
                         context.Response.Headers[header.Key] = header.Value;
                     }
 
-                    if (!string.IsNullOrEmpty(body))
+                    if (!string.IsNullOrEmpty(httpFiile.Body))
                     {
-                        await context.Response.WriteAsync(body);
+                        await context.Response.WriteAsync(httpFiile.Body);
                     }
 
                     return; // Short-circuit the pipeline if a file is served

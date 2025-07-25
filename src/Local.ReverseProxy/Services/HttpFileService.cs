@@ -1,4 +1,7 @@
-﻿namespace Local.ReverseProxy.Services
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Text.RegularExpressions;
+
+namespace Local.ReverseProxy.Services
 {
     public class HttpFileService : IHttpFileService
     {
@@ -30,48 +33,8 @@
                     var result = new List<HttpFileInfo>();
                     foreach (var file in files)
                     {
-                        var lines = File.ReadLines(file)
-                            .Where(l => !string.IsNullOrWhiteSpace(l) && !l.TrimStart().StartsWith("#"))
-                            .ToList();
-                        if (lines.Count == 0)
-                            continue;
-
-                        var firstLine = lines[0].Trim();
-                        var parts = firstLine.Split(' ', 2);
-                        if (parts.Length != 2)
-                            continue;
-
-                        var info = new HttpFileInfo
-                        {
-                            FileName = Path.GetFileName(file),
-                            Method = parts[0],
-                            Url = parts[1]
-                        };
-
-                        // Parse headers and body
-                        int i = 1;
-                        for (; i < lines.Count; i++)
-                        {
-                            var line = lines[i];
-                            if (string.IsNullOrWhiteSpace(line))
-                            {
-                                i++; // Move to the line after the blank line
-                                break;
-                            }
-
-                            if (!line.Contains(':'))
-                                break;
-
-                            var headerParts = line.Split(':', 2);
-                            if (headerParts.Length == 2)
-                                info.Headers[headerParts[0].Trim()] = headerParts[1].Trim();
-                        }
-
-                        // The rest is body
-                        if (i < lines.Count)
-                            info.Body = string.Join("\n", lines.Skip(i));
-
-                        result.Add(info);
+                        var fileIfoList = ParseHttpFile(file).GetAwaiter().GetResult(); // Synchronously wait for the async method
+                        result.AddRange(fileIfoList);
                     }
 
                     _cache = result;
@@ -82,5 +45,105 @@
             }
         }
 
+        public async Task<IEnumerable<HttpFileInfo>> ParseHttpFile(string file)
+        {
+            var listFileInfo = new List<HttpFileInfo>();
+
+            var fullFileContent = await File.ReadAllTextAsync(file);
+            var fileContentParts = fullFileContent.Split("###");
+            foreach (var fileContent in fileContentParts)
+            {
+                var httpFile = ParseHttpFileContent(fileContent);
+                httpFile.FileName = Path.GetFileName(file);
+                listFileInfo.Add(httpFile);
+            }
+            return listFileInfo;
+        }
+
+        private HttpFileInfo ParseHttpFileContent(string fileContent)
+        {
+            var info = new HttpFileInfo
+            {
+                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                Body = string.Empty,
+                StatusCode = StatusCodes.Status200OK
+            };
+
+            using (StringReader reader = new StringReader(fileContent))
+            {
+                string line;
+                bool inBody = false;
+                bool isFirstLine = true;
+
+                while ((line = reader.ReadLine()) != null)
+                {
+                    if (line.TrimStart().StartsWith("#"))
+                    {
+                        continue;// Skip comments
+                    }
+                    if (isFirstLine)
+                    {
+                        // Parse the first line for method and URL (e.g., GET /api/resource)
+                        var firstLineMatch = Regex.Match(line, @"^(\w+)\s+(\S+)");
+                        if (firstLineMatch.Success)
+                        {
+                            info.Method = firstLineMatch.Groups[1].Value.Trim();
+                            info.Url = firstLineMatch.Groups[2].Value.Trim();
+                        }
+                        else
+                        {
+                            throw new FormatException("Invalid HTTP request line format.");
+                        }
+                        isFirstLine = false;
+                    }
+
+                    if (!inBody)
+                    {
+                        // Check for HTTP status line (e.g., HTTP/1.1 200 OK)
+                        var statusMatch = Regex.Match(line, @"^HTTP/\d\.\d\s+(\d+)\s*.*");
+                        if (statusMatch.Success)
+                        {
+                            if (int.TryParse(statusMatch.Groups[1].Value, out int parsedStatusCode))
+                            {
+                                info.StatusCode = parsedStatusCode;
+                            }
+                            continue;
+                        }
+
+                        // Check for empty line separating headers from body
+                        if (string.IsNullOrWhiteSpace(line))
+                        {
+                            inBody = true;
+                            continue;
+                        }
+
+                        // Parse headers (e.g., Content-Type: application/json)
+                        var headerMatch = Regex.Match(line, @"^([\w-]+):\s*(.*)");
+                        if (headerMatch.Success)
+                        {
+                            info.Headers[headerMatch.Groups[1].Value] = headerMatch.Groups[2].Value.Trim();
+                        }
+                    }
+                    else
+                    {
+                        // Accumulate body content
+                        if (string.IsNullOrEmpty(info.Body))
+                        {
+                            info.Body = line;
+                        }
+                        else
+                        {
+                            info.Body += Environment.NewLine + line;
+                        }
+                    }
+                }
+            }
+            return info;
+        }
+
+        public bool Exists([NotNullWhen(true)] string? path)
+        {
+            return File.Exists(path) || Directory.Exists(path);
+        }
     }
 }
