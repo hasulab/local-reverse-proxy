@@ -7,8 +7,8 @@ namespace Local.ReverseProxy.Extensions
         public static IApplicationBuilder UseHttpFileMiddleware(this IApplicationBuilder builder, string basePath)
         {
             return builder
-                .UseMiddleware<HttpFileMiddleware>(basePath);
-                //.UseMiddleware<FakeResponseMiddleware>();
+                .UseMiddleware<HttpFileMiddleware>(basePath)
+                .UseMiddleware<FakeResponseMiddleware>();
         }
 
         public static IApplicationBuilder UseProxyMiddleware(this IApplicationBuilder builder)
