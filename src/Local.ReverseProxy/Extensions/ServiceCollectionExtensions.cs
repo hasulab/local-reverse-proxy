@@ -6,7 +6,9 @@ namespace Local.ReverseProxy.Extensions
     {
         public static IServiceCollection AddHttpFile(this IServiceCollection services)
         {
-            return services.AddSingleton<IHttpFileService, HttpFileService>();
+            return services
+                .AddSingleton<IHttpFileService, HttpFileService>()
+                .AddSingleton<IFileService, FileService>();
         }
     }
 }

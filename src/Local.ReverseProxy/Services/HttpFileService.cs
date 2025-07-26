@@ -5,16 +5,17 @@ namespace Local.ReverseProxy.Services
 {
     public class HttpFileService : IHttpFileService
     {
+        private readonly IFileService _fileService;
         private readonly string _folderPath;
         private List<HttpFileInfo>? _cache;
         private bool _cacheInitialized = false;
         private readonly object _cacheLock = new();
 
-        public HttpFileService(string? folderPath = null)
+        public HttpFileService(IFileService fileService, string? folderPath = null)
         {
-            _folderPath = folderPath ?? Path.Combine(Directory.GetCurrentDirectory(), "HttpFiles");
+            _fileService = fileService;
+            _folderPath = folderPath ?? _fileService.Combine(Directory.GetCurrentDirectory(), "HttpFiles");
         }
-
         public IEnumerable<HttpFileInfo> GetHttpFilesInfo()
         {
             if (_cacheInitialized && _cache != null)
@@ -25,11 +26,11 @@ namespace Local.ReverseProxy.Services
                 if (_cacheInitialized && _cache != null)
                     return _cache;
 
-                if (!Directory.Exists(_folderPath))
+                if (!_fileService.DirectoryExists(_folderPath))
                     _cache = new List<HttpFileInfo>();
                 else
                 {
-                    var files = Directory.GetFiles(_folderPath, "*.http");
+                    var files = _fileService.GetFiles(_folderPath, "*.http");
                     var result = new List<HttpFileInfo>();
                     foreach (var file in files)
                     {
@@ -49,12 +50,13 @@ namespace Local.ReverseProxy.Services
         {
             var listFileInfo = new List<HttpFileInfo>();
 
-            var fullFileContent = await File.ReadAllTextAsync(file);
+            var fullFileContent = await _fileService.ReadAllTextAsync(file);
             var fileContentParts = fullFileContent.Split("###");
+            var fileName = _fileService.GetFileName(file);
             foreach (var fileContent in fileContentParts)
             {
                 var httpFile = ParseHttpFileContent(fileContent);
-                httpFile.FileName = Path.GetFileName(file);
+                httpFile.FileName = fileName;
                 listFileInfo.Add(httpFile);
             }
             return listFileInfo;
@@ -68,6 +70,14 @@ namespace Local.ReverseProxy.Services
                 Body = string.Empty,
                 StatusCode = StatusCodes.Status200OK
             };
+
+            if (string.IsNullOrWhiteSpace(fileContent))
+            {
+                throw new ArgumentException("File content cannot be null or empty.", nameof(fileContent));
+            }
+
+            // Trim leading whitespace to handle any indentation
+            fileContent = fileContent.TrimStart();
 
             using (StringReader reader = new StringReader(fileContent))
             {
@@ -95,9 +105,8 @@ namespace Local.ReverseProxy.Services
                             throw new FormatException("Invalid HTTP request line format.");
                         }
                         isFirstLine = false;
-                    }
-
-                    if (!inBody)
+                    } 
+                    else if (!inBody)
                     {
                         // Check for HTTP status line (e.g., HTTP/1.1 200 OK)
                         var statusMatch = Regex.Match(line, @"^HTTP/\d\.\d\s+(\d+)\s*.*");
@@ -143,7 +152,8 @@ namespace Local.ReverseProxy.Services
 
         public bool Exists([NotNullWhen(true)] string? path)
         {
-            return File.Exists(path) || Directory.Exists(path);
+            return _fileService.FileExists(path) || _fileService.DirectoryExists(path);
         }
     }
+
 }
