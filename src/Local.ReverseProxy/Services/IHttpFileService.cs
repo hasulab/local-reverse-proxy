@@ -8,6 +8,7 @@ namespace Local.ReverseProxy.Services
         IEnumerable<HttpFileInfo> GetHttpFilesInfo();
         Task<IEnumerable<HttpFileInfo>> ParseHttpFile(string file);
         bool Exists([NotNullWhen(true)] string? path);
+        bool ValidateUrl(HttpRequest request, out Dictionary<string, string> outParams);
     }
     public interface IFileService
     {

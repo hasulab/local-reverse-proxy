@@ -1,4 +1,5 @@
-﻿using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Text.RegularExpressions;
 
 namespace Local.ReverseProxy.Services
@@ -99,6 +100,15 @@ namespace Local.ReverseProxy.Services
                         {
                             info.Method = firstLineMatch.Groups[1].Value.Trim();
                             info.Url = firstLineMatch.Groups[2].Value.Trim();
+                            var parsedUrl = ValidateUrlInternal(info.Url);
+                            if (!parsedUrl.isValid)
+                            {
+                                throw new FormatException($"Invalid URL format: {info.Url}");
+                            }
+                            info.UrlPath = parsedUrl.path;
+                            info.UrlHost = parsedUrl.host;
+                            info.UrlValid = parsedUrl.isValid;
+                            info.UrlSegments = info.Url.Split('/');
                         }
                         else
                         {
@@ -150,9 +160,70 @@ namespace Local.ReverseProxy.Services
             return info;
         }
 
+        static Regex UrlRegex = new Regex(@"^(?:https?:\/\/)?(?<host>{{[a-zA-Z0-9_]+}}|[a-zA-Z0-9.-]+)(?<path>\/[^\s]*)?$");
+        (bool isValid, string host ,string path) ValidateUrlInternal(string? url)
+        {
+            if (string.IsNullOrEmpty(url))
+                return (false, null, null);
+
+            if (url.StartsWith("/"))
+            {
+                return (true, null, url);
+            }
+            else
+            {
+                var match = UrlRegex.Match(url);
+                if (match.Success)
+                {
+                    var host = match.Groups["host"].Value;
+                    var path = match.Groups["path"].Value;
+                    return (true, host, path);
+                }
+            }
+            return (false, null, null);
+        }
+
         public bool Exists([NotNullWhen(true)] string? path)
         {
             return _fileService.FileExists(path) || _fileService.DirectoryExists(path);
+        }
+
+        public bool ValidateUrl(HttpRequest request, out Dictionary<string,string> outParams)
+        {
+            outParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (request == null || string.IsNullOrEmpty(request.Path))
+                return false;
+
+            var path = request.Path.Value;
+            if (string.IsNullOrEmpty(path))
+                return false;
+
+            foreach(var httpFileInfo in _cache ?? GetHttpFilesInfo())
+            {
+                if (httpFileInfo.Method != request.Method)
+                    continue;
+
+                if (httpFileInfo.Url == path || httpFileInfo.UrlPath == path)
+                    return true;
+
+                var urlSegments = path.Split('/');
+
+                if (httpFileInfo?.UrlSegments.Length == urlSegments.Length)
+                {
+                    bool isValid = true;
+                    for (int i = 0; i < httpFileInfo.UrlSegments.Length; i++)
+                    {
+                        if (httpFileInfo.UrlSegments[i] != urlSegments[i] && !httpFileInfo.UrlSegments[i].StartsWith("{{"))
+                        {
+                            isValid = false;
+                            break;
+                        }
+                    }
+                    if (isValid)
+                        return true;
+                }
+            }
+            return false;
         }
     }
 
