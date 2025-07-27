@@ -8,7 +8,7 @@ namespace Local.ReverseProxy.Services
     {
         private readonly IFileService _fileService;
         private readonly string _folderPath;
-        private List<HttpFileInfo>? _cache;
+        private List<HttpFileRoute>? _cache;
         private bool _cacheInitialized = false;
         private readonly object _cacheLock = new();
 
@@ -17,7 +17,7 @@ namespace Local.ReverseProxy.Services
             _fileService = fileService;
             _folderPath = folderPath ?? _fileService.Combine(Directory.GetCurrentDirectory(), "HttpFiles");
         }
-        public IEnumerable<HttpFileInfo> GetHttpFilesInfo()
+        public IEnumerable<HttpFileRoute> GetHttpFilesInfo()
         {
             if (_cacheInitialized && _cache != null)
                 return _cache;
@@ -28,11 +28,11 @@ namespace Local.ReverseProxy.Services
                     return _cache;
 
                 if (!_fileService.DirectoryExists(_folderPath))
-                    _cache = new List<HttpFileInfo>();
+                    _cache = new List<HttpFileRoute>();
                 else
                 {
                     var files = _fileService.GetFiles(_folderPath, "*.http");
-                    var result = new List<HttpFileInfo>();
+                    var result = new List<HttpFileRoute>();
                     foreach (var file in files)
                     {
                         var fileIfoList = ParseHttpFile(file).GetAwaiter().GetResult(); // Synchronously wait for the async method
@@ -47,26 +47,26 @@ namespace Local.ReverseProxy.Services
             }
         }
 
-        public async Task<IEnumerable<HttpFileInfo>> ParseHttpFile(string file)
+        public async Task<IEnumerable<HttpFileRoute>> ParseHttpFile(string file)
         {
-            var listFileInfo = new List<HttpFileInfo>();
+            var routes = new List<HttpFileRoute>();
 
             var fullFileContent = await _fileService.ReadAllTextAsync(file);
             var fileContentParts = fullFileContent.Split("###");
             var fileName = _fileService.GetFileName(file);
             foreach (var fileContent in fileContentParts)
             {
-                var httpFile = ParseHttpFileContent(fileContent);
-                httpFile.FileName = fileName;
-                listFileInfo.Add(httpFile);
+                var httpFileRoute = ParseHttpFileContent(fileContent);
+                httpFileRoute.FileName = fileName;
+                routes.Add(httpFileRoute);
             }
-            return listFileInfo;
+            return routes;
         }
 
-        private HttpFileInfo ParseHttpFileContent(string fileContent)
+        private HttpFileRoute ParseHttpFileContent(string fileContent)
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            var info = new HttpFileInfo
+            var route = new HttpFileRoute
             {
                 Headers = headers,
                 Body = string.Empty,
@@ -99,21 +99,21 @@ namespace Local.ReverseProxy.Services
                         var firstLineMatch = Regex.Match(line, @"^(\w+)\s+(\S+)");
                         if (firstLineMatch.Success)
                         {
-                            info.Method = firstLineMatch.Groups[1].Value.Trim();
-                            info.Url = firstLineMatch.Groups[2].Value.Trim();
-                            var parsedUrl = ValidateUrlInternal(info.Url);
+                            route.Method = firstLineMatch.Groups[1].Value.Trim();
+                            route.Url = firstLineMatch.Groups[2].Value.Trim();
+                            var parsedUrl = ValidateUrlInternal(route.Url);
                             if (!parsedUrl.isValid)
                             {
-                                throw new FormatException($"Invalid URL format: {info.Url}");
+                                throw new FormatException($"Invalid URL format: {route.Url}");
                             }
-                            info.UrlHost = parsedUrl.host;
-                            info.UrlPath = parsedUrl.path;
-                            info.UrlValid = parsedUrl.isValid;
-                            info.UrlSegments = info.Url.Split('/');
-                            info.QueryString = parsedUrl.query;
-                            if (!string.IsNullOrEmpty(info.QueryString))
+                            route.UrlHost = parsedUrl.host;
+                            route.UrlPath = parsedUrl.path;
+                            route.UrlValid = parsedUrl.isValid;
+                            route.UrlSegments = route.Url.Split('/');
+                            route.QueryString = parsedUrl.query;
+                            if (!string.IsNullOrEmpty(route.QueryString))
                             {
-                                info.QuerySegments = info.QueryString.Split('&')
+                                route.QuerySegments = route.QueryString.Split('&')
                                     .Select(q => q.Split('='))
                                     .ToDictionary(kv => kv[0], kv => kv.Length > 1 ? kv[1] : string.Empty, StringComparer.OrdinalIgnoreCase);
                             }
@@ -132,7 +132,7 @@ namespace Local.ReverseProxy.Services
                         {
                             if (int.TryParse(statusMatch.Groups[1].Value, out int parsedStatusCode))
                             {
-                                info.StatusCode = parsedStatusCode;
+                                route.StatusCode = parsedStatusCode;
                             }
                             continue;
                         }
@@ -154,18 +154,18 @@ namespace Local.ReverseProxy.Services
                     else
                     {
                         // Accumulate body content
-                        if (string.IsNullOrEmpty(info.Body))
+                        if (string.IsNullOrEmpty(route.Body))
                         {
-                            info.Body = line;
+                            route.Body = line;
                         }
                         else
                         {
-                            info.Body += Environment.NewLine + line;
+                            route.Body += Environment.NewLine + line;
                         }
                     }
                 }
             }
-            return info;
+            return route;
         }
 
         static Regex UrlRegex = new Regex(@"^(?:https?:\/\/)?(?<host>{{[a-zA-Z0-9_]+}}|[a-zA-Z0-9.-]+(?::\d+)?)(?<path>\/[^\s]*)?$");
@@ -206,9 +206,10 @@ namespace Local.ReverseProxy.Services
             return _fileService.FileExists(path) || _fileService.DirectoryExists(path);
         }
 
-        public bool ValidateUrl(HttpRequest request, out IReadOnlyDictionary<string, string> outParams)
+        public bool ValidateUrl(HttpRequest request, out HttpFileRoute matchedRoute,  out IReadOnlyDictionary<string, string> outParams)
         {
             outParams = Defaults.EmptyString2Dictionary;// new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            matchedRoute = null;
             if (request == null || string.IsNullOrEmpty(request.Path))
                 return false;
 
@@ -218,36 +219,40 @@ namespace Local.ReverseProxy.Services
             if (string.IsNullOrEmpty(path))
                 return false;
 
-            foreach(var httpFileInfo in _cache ?? GetHttpFilesInfo())
+            foreach(var httpFileRoute in _cache ?? GetHttpFilesInfo())
             {
-                if (httpFileInfo.Method != request.Method)
+                if (httpFileRoute.Method != request.Method)
                     continue;
 
-                if (httpFileInfo.Url == pathAndQuery
-                    || (httpFileInfo.UrlPath == path && httpFileInfo.QueryString == queryString))
-                    return true;
-
-                if (MatchPath(httpFileInfo, path) && MatchQueryString(httpFileInfo, queryString))
+                if (httpFileRoute.Url == pathAndQuery
+                    || (httpFileRoute.UrlPath == path && httpFileRoute.QueryString == queryString))
                 {
+                     matchedRoute = httpFileRoute;
+                    return true;
+                }
+
+                if (MatchPath(httpFileRoute, path) && MatchQueryString(httpFileRoute, queryString))
+                {
+                    matchedRoute = httpFileRoute;
                     return true;
                 }
             }
             return false;
         }
 
-        private static bool MatchPath(HttpFileInfo httpFileInfo, string path)
+        private static bool MatchPath(HttpFileRoute httpFileRoute, string path)
         {
-            if (httpFileInfo.UrlPath == path)
+            if (httpFileRoute.UrlPath == path)
                 return true;
 
             var urlSegments = path.Split('/');
 
-            if (httpFileInfo?.UrlSegments.Length == urlSegments.Length)
+            if (httpFileRoute?.UrlSegments.Length == urlSegments.Length)
             {
                 bool isValid = true;
-                for (int i = 0; i < httpFileInfo.UrlSegments.Length; i++)
+                for (int i = 0; i < httpFileRoute.UrlSegments.Length; i++)
                 {
-                    if (httpFileInfo.UrlSegments[i] != urlSegments[i] && !httpFileInfo.UrlSegments[i].StartsWith("{{"))
+                    if (httpFileRoute.UrlSegments[i] != urlSegments[i] && !httpFileRoute.UrlSegments[i].StartsWith("{{"))
                     {
                         isValid = false;
                         break;
@@ -258,12 +263,12 @@ namespace Local.ReverseProxy.Services
             }
             return false;
         }
-        private static bool MatchQueryString(HttpFileInfo httpFileInfo, string queryString)
+        private static bool MatchQueryString(HttpFileRoute httpFileRoute, string queryString)
         {
-            if (httpFileInfo.QueryString == queryString)
+            if (httpFileRoute.QueryString == queryString)
                 return true;
 
-            if (string.IsNullOrEmpty(httpFileInfo.QueryString) == string.IsNullOrEmpty(queryString))
+            if (string.IsNullOrEmpty(httpFileRoute.QueryString) == string.IsNullOrEmpty(queryString))
                 return true;
 
             var querySegments = queryString.Split('&')
@@ -271,10 +276,10 @@ namespace Local.ReverseProxy.Services
                 .ToDictionary(kv => kv[0], kv => kv.Length > 1 ? kv[1] : string.Empty, StringComparer.OrdinalIgnoreCase);
 
 
-            if (httpFileInfo?.QuerySegments.Count == querySegments.Count)
+            if (httpFileRoute?.QuerySegments.Count == querySegments.Count)
             {
                 bool isValid = true;
-                var cachedQuerySegments = httpFileInfo.QuerySegments.ToArray();
+                var cachedQuerySegments = httpFileRoute.QuerySegments.ToArray();
                 var querySegmentsArr = querySegments.ToArray();
                 for (int i = 0; i < cachedQuerySegments.Length; i++)
                 {

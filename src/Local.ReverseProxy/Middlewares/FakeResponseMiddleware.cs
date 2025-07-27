@@ -1,4 +1,5 @@
 ﻿using Local.ReverseProxy.Services;
+using Microsoft.AspNetCore.Http;
 
 namespace Local.ReverseProxy.Middlewares
 {
@@ -19,7 +20,7 @@ namespace Local.ReverseProxy.Middlewares
 
         public async Task InvokeAsync(HttpContext context)
         {
-            if (_httpFileService.ValidateUrl(context.Request, out var outParams))
+            if (_httpFileService.ValidateUrl(context.Request, out HttpFileRoute matchedRoute, out var outParams))
             {
                 try
                 {
@@ -51,17 +52,14 @@ namespace Local.ReverseProxy.Middlewares
 
                     _logger.LogInformation(logMessage);
 
-                    context.Response.StatusCode = 200;
-                    context.Response.ContentType = "application/json";
-
                     // Write headers and payload to response
-                    var responseObj = new
+                    context.Response.StatusCode = matchedRoute.StatusCode;
+                    context.Response.ContentType = "application/json";
+                    foreach (var header in matchedRoute.Headers)
                     {
-                        message = "OK"
-                    };
-
-                    var json = System.Text.Json.JsonSerializer.Serialize(responseObj);
-                    await context.Response.WriteAsync(json);
+                        context.Response.Headers[header.Key] = header.Value;
+                    }
+                    await context.Response.WriteAsync(matchedRoute.Body);
                 }
                 catch (Exception ex)
                 {

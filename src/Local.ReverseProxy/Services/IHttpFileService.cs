@@ -5,10 +5,10 @@ namespace Local.ReverseProxy.Services
 {
     public interface IHttpFileService
     {
-        IEnumerable<HttpFileInfo> GetHttpFilesInfo();
-        Task<IEnumerable<HttpFileInfo>> ParseHttpFile(string file);
+        IEnumerable<HttpFileRoute> GetHttpFilesInfo();
+        Task<IEnumerable<HttpFileRoute>> ParseHttpFile(string file);
         bool Exists([NotNullWhen(true)] string? path);
-        bool ValidateUrl(HttpRequest request, out IReadOnlyDictionary<string, string> outParams);
+        bool ValidateUrl(HttpRequest request, out HttpFileRoute matchedRoute, out IReadOnlyDictionary<string, string> outParams);
     }
     public interface IFileService
     {
