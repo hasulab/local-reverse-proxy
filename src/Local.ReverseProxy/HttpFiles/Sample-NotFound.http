@@ -2,3 +2,7 @@ GET http://localhost:5000/api/values/10
 Status-Code: HTTP/1.1 404 NotFound
 Content-Type: application/json
 
+{
+  "status": 404,
+  "message": "The resource you are looking for has not been found."
+}
