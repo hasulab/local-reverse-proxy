@@ -43,8 +43,8 @@ namespace Local.ReverseProxy.Middlewares
                     }
 
                     // Log info: method, url, headers (each on new line), payload
-                    var logMessage = $"{DateTime.Now:G} {context.Request.Method} {context.Request.Path}\n" +
-                        $"Processing {context.Request.Method} {context.Request.Path}{context.Request.QueryString}\n" +
+                    var logMessage = $"Processing {context.Request.Method} {context.Request.Path} {DateTime.Now:G}\n" +
+                        $"{context.Request.Method} {context.Request.Path}{context.Request.QueryString}\n" +
                                      string.Join("\n", headers) +
                                      (headers.Count > 0 ? "\n" : "") +
                                      payload +
