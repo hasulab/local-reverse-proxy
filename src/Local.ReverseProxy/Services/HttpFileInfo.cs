@@ -1,4 +1,6 @@
-﻿namespace Local.ReverseProxy.Services
+﻿using System.Collections.ObjectModel;
+
+namespace Local.ReverseProxy.Services
 {
     public class HttpFileInfo
     {
@@ -9,8 +11,17 @@
         public string UrlHost { get; set; }
         public string UrlPath { get; set; }
         public string Body { get; internal set; }
-        public Dictionary<string,string> Headers { get; internal set; }
+        public IReadOnlyDictionary<string,string> Headers { get; internal set; } = Defaults.EmptyString2Dictionary;
         public int StatusCode { get; set; }
         public string[] UrlSegments { get; internal set; }
+        public string QueryString { get; internal set; }
+        public IReadOnlyDictionary<string, string> QuerySegments { get; internal set; } = Defaults.EmptyString2Dictionary;
+        
+        public override string ToString()
+        {
+            return $"{Method} {Url} {StatusCode}\n" +
+                   $"{string.Join("\n", Headers.Select(h => $"{h.Key}: {h.Value}"))}\n" +
+                   $"{Body}";
+        }
     }
 }

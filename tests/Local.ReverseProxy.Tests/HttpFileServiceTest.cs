@@ -63,8 +63,10 @@ namespace Local.ReverseProxy.Tests
             Assert.Equal("/test4", result.Last().Url);
         }
 
-        [Fact]
-        public void ValidateUrlTest()
+        [Theory]
+        //[InlineData("GET /test1\n \n{ \"message\":\"OK\" }\n###\nPOST /test2\n \n{ \"message\":\"OK\" }\n", 2)]
+        [InlineData("GET", "http://example.com/test1?param=value", true)]
+        public void ValidateUrlTest(string method, string url, bool expectedResult)
         {
             string[] urls = {
             "http://anyurl.com/params",
@@ -80,16 +82,19 @@ namespace Local.ReverseProxy.Tests
             moqFileService
                 .Setup(fs => fs.GetFiles(It.IsAny<string>(), It.IsAny<string>()))
                 .Returns(["testFile1.http", "testFile2.http"]);
+
             moqFileService
                 .Setup(fs => fs.ReadAllTextAsync("testFile1.http", It.IsAny<CancellationToken>()))
-                .ReturnsAsync("GET /test1\n \n{ \"message\":\"OK\" }\n###\nPOST /test2\n \n{ \"message\":\"OK\" }\n");
+                .ReturnsAsync("GET /test1?param=value\n \n{ \"message\":\"OK\" }\n###\nPOST /test2\n \n{ \"message\":\"OK\" }\n");
 
             moqFileService
                 .Setup(fs => fs.ReadAllTextAsync("testFile2.http", It.IsAny<CancellationToken>()))
                 .ReturnsAsync("GET /test3\nheader1:val1\n \n{ \"message\":\"OK\" }\n###\nPUT /test4\n \n{ \"message\":\"OK\" }\n");
             moqFileService.Setup(fs => fs.GetFileName(It.IsAny<string>()))
                 .Returns((string path) => Path.GetFileName(path));
-
+            
+            var uri = new Uri(url);
+            
             // Act
             var result = service.GetHttpFilesInfo();
             // Assert
@@ -99,15 +104,15 @@ namespace Local.ReverseProxy.Tests
             {
                 Request =
                 {
-                    Method = "GET",
-                    Path = "/test1",
-                    QueryString = new QueryString("?param=value"),
-                    Headers = { { "Host", "example.com" } }
+                    Method = method,
+                    Path = uri.AbsolutePath,
+                    QueryString = new QueryString(uri.Query),
+                    Headers = { { "Host", uri.Host } }
                 }
             };
             HttpRequest request = httpContext.Request;
             var validUrlResult = service.ValidateUrl(request, out var outParams);
-            Assert.True(validUrlResult, "URL should be valid");
+            Assert.Equal(expectedResult, validUrlResult);
         }
 
     }

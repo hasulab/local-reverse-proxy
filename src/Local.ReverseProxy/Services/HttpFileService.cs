@@ -1,5 +1,5 @@
-﻿using System;
-using System.Diagnostics.CodeAnalysis;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.IO;
 using System.Text.RegularExpressions;
 
 namespace Local.ReverseProxy.Services
@@ -65,9 +65,10 @@ namespace Local.ReverseProxy.Services
 
         private HttpFileInfo ParseHttpFileContent(string fileContent)
         {
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             var info = new HttpFileInfo
             {
-                Headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase),
+                Headers = headers,
                 Body = string.Empty,
                 StatusCode = StatusCodes.Status200OK
             };
@@ -105,10 +106,17 @@ namespace Local.ReverseProxy.Services
                             {
                                 throw new FormatException($"Invalid URL format: {info.Url}");
                             }
-                            info.UrlPath = parsedUrl.path;
                             info.UrlHost = parsedUrl.host;
+                            info.UrlPath = parsedUrl.path;
                             info.UrlValid = parsedUrl.isValid;
                             info.UrlSegments = info.Url.Split('/');
+                            info.QueryString = parsedUrl.query;
+                            if (!string.IsNullOrEmpty(info.QueryString))
+                            {
+                                info.QuerySegments = info.QueryString.Split('&')
+                                    .Select(q => q.Split('='))
+                                    .ToDictionary(kv => kv[0], kv => kv.Length > 1 ? kv[1] : string.Empty, StringComparer.OrdinalIgnoreCase);
+                            }
                         }
                         else
                         {
@@ -140,7 +148,7 @@ namespace Local.ReverseProxy.Services
                         var headerMatch = Regex.Match(line, @"^([\w-]+):\s*(.*)");
                         if (headerMatch.Success)
                         {
-                            info.Headers[headerMatch.Groups[1].Value] = headerMatch.Groups[2].Value.Trim();
+                            headers[headerMatch.Groups[1].Value] = headerMatch.Groups[2].Value.Trim();
                         }
                     }
                     else
@@ -160,15 +168,16 @@ namespace Local.ReverseProxy.Services
             return info;
         }
 
-        static Regex UrlRegex = new Regex(@"^(?:https?:\/\/)?(?<host>{{[a-zA-Z0-9_]+}}|[a-zA-Z0-9.-]+)(?<path>\/[^\s]*)?$");
-        (bool isValid, string host ,string path) ValidateUrlInternal(string? url)
+        static Regex UrlRegex = new Regex(@"^(?:https?:\/\/)?(?<host>{{[a-zA-Z0-9_]+}}|[a-zA-Z0-9.-]+(?::\d+)?)(?<path>\/[^\s]*)?$");
+        (bool isValid, string host ,string path, string query) ValidateUrlInternal(string? url)
         {
             if (string.IsNullOrEmpty(url))
-                return (false, null, null);
+                return (false, null, null, null);
 
             if (url.StartsWith("/"))
             {
-                return (true, null, url);
+                ExtractPathAndQuery(url, out string path, out string query);
+                return (true, null, path, query);
             }
             else
             {
@@ -176,11 +185,20 @@ namespace Local.ReverseProxy.Services
                 if (match.Success)
                 {
                     var host = match.Groups["host"].Value;
-                    var path = match.Groups["path"].Value;
-                    return (true, host, path);
+                    var pathNquery = match.Groups["path"].Value;
+                    ExtractPathAndQuery(pathNquery, out string path, out string query);
+
+                    return (true, host, path, query);
                 }
             }
-            return (false, null, null);
+            return (false, null, null, null);
+
+            static void ExtractPathAndQuery(string url, out string path, out string query)
+            {
+                var uriParts = url.Split(new[] { '?' }, 2);
+                path = uriParts[0];
+                query = uriParts.Length > 1 ? '?'+ uriParts[1] : string.Empty;
+            }
         }
 
         public bool Exists([NotNullWhen(true)] string? path)
@@ -188,13 +206,15 @@ namespace Local.ReverseProxy.Services
             return _fileService.FileExists(path) || _fileService.DirectoryExists(path);
         }
 
-        public bool ValidateUrl(HttpRequest request, out Dictionary<string,string> outParams)
+        public bool ValidateUrl(HttpRequest request, out IReadOnlyDictionary<string, string> outParams)
         {
-            outParams = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            outParams = Defaults.EmptyString2Dictionary;// new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
             if (request == null || string.IsNullOrEmpty(request.Path))
                 return false;
 
+            var pathAndQuery = request.Path.Value+ request.QueryString.Value;
             var path = request.Path.Value;
+            var queryString = request.QueryString.Value;
             if (string.IsNullOrEmpty(path))
                 return false;
 
@@ -203,25 +223,69 @@ namespace Local.ReverseProxy.Services
                 if (httpFileInfo.Method != request.Method)
                     continue;
 
-                if (httpFileInfo.Url == path || httpFileInfo.UrlPath == path)
+                if (httpFileInfo.Url == pathAndQuery
+                    || (httpFileInfo.UrlPath == path && httpFileInfo.QueryString == queryString))
                     return true;
 
-                var urlSegments = path.Split('/');
-
-                if (httpFileInfo?.UrlSegments.Length == urlSegments.Length)
+                if (MatchPath(httpFileInfo, path) && MatchQueryString(httpFileInfo, queryString))
                 {
-                    bool isValid = true;
-                    for (int i = 0; i < httpFileInfo.UrlSegments.Length; i++)
-                    {
-                        if (httpFileInfo.UrlSegments[i] != urlSegments[i] && !httpFileInfo.UrlSegments[i].StartsWith("{{"))
-                        {
-                            isValid = false;
-                            break;
-                        }
-                    }
-                    if (isValid)
-                        return true;
+                    return true;
                 }
+            }
+            return false;
+        }
+
+        private static bool MatchPath(HttpFileInfo httpFileInfo, string path)
+        {
+            if (httpFileInfo.UrlPath == path)
+                return true;
+
+            var urlSegments = path.Split('/');
+
+            if (httpFileInfo?.UrlSegments.Length == urlSegments.Length)
+            {
+                bool isValid = true;
+                for (int i = 0; i < httpFileInfo.UrlSegments.Length; i++)
+                {
+                    if (httpFileInfo.UrlSegments[i] != urlSegments[i] && !httpFileInfo.UrlSegments[i].StartsWith("{{"))
+                    {
+                        isValid = false;
+                        break;
+                    }
+                }
+                if (isValid)
+                    return true;
+            }
+            return false;
+        }
+        private static bool MatchQueryString(HttpFileInfo httpFileInfo, string queryString)
+        {
+            if (httpFileInfo.QueryString == queryString)
+                return true;
+
+            if (string.IsNullOrEmpty(httpFileInfo.QueryString) == string.IsNullOrEmpty(queryString))
+                return true;
+
+            var querySegments = queryString.Split('&')
+                .Select(q => q.Split('='))
+                .ToDictionary(kv => kv[0], kv => kv.Length > 1 ? kv[1] : string.Empty, StringComparer.OrdinalIgnoreCase);
+
+
+            if (httpFileInfo?.QuerySegments.Count == querySegments.Count)
+            {
+                bool isValid = true;
+                var cachedQuerySegments = httpFileInfo.QuerySegments.ToArray();
+                var querySegmentsArr = querySegments.ToArray();
+                for (int i = 0; i < cachedQuerySegments.Length; i++)
+                {
+                    if (cachedQuerySegments[i].Key != querySegmentsArr[i].Key && !cachedQuerySegments[i].Value.StartsWith("{{"))
+                    {
+                        isValid = false;
+                        break;
+                    }
+                }
+                if (isValid)
+                    return true;
             }
             return false;
         }
