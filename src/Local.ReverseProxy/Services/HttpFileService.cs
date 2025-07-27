@@ -126,17 +126,6 @@ namespace Local.ReverseProxy.Services
                     } 
                     else if (!inBody)
                     {
-                        // Check for HTTP status line (e.g., HTTP/1.1 200 OK)
-                        var statusMatch = Regex.Match(line, @"^HTTP/\d\.\d\s+(\d+)\s*.*");
-                        if (statusMatch.Success)
-                        {
-                            if (int.TryParse(statusMatch.Groups[1].Value, out int parsedStatusCode))
-                            {
-                                route.StatusCode = parsedStatusCode;
-                            }
-                            continue;
-                        }
-
                         // Check for empty line separating headers from body
                         if (string.IsNullOrWhiteSpace(line))
                         {
@@ -148,7 +137,21 @@ namespace Local.ReverseProxy.Services
                         var headerMatch = Regex.Match(line, @"^([\w-]+):\s*(.*)");
                         if (headerMatch.Success)
                         {
-                            headers[headerMatch.Groups[1].Value] = headerMatch.Groups[2].Value.Trim();
+                            var headerName = headerMatch.Groups[1].Value;
+                            var headerValue = headerMatch.Groups[2].Value.Trim();
+                            headers[headerName] = headerValue;
+                            if (headerName.Equals("Status-Code", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // Check for HTTP status line (e.g., HTTP/1.1 200 OK)
+                                var statusMatch = Regex.Match(headerValue, @"^HTTP/\d\.\d\s+(\d+)\s*.*");
+                                if (statusMatch.Success)
+                                {
+                                    if (int.TryParse(statusMatch.Groups[1].Value, out int parsedStatusCode))
+                                    {
+                                        route.StatusCode = parsedStatusCode;
+                                    }
+                                }
+                            }
                         }
                     }
                     else

@@ -111,7 +111,7 @@ namespace Local.ReverseProxy.Tests
                 }
             };
             HttpRequest request = httpContext.Request;
-            var validUrlResult = service.ValidateUrl(request, out var outParams);
+            var validUrlResult = service.ValidateUrl(request, out var route, out var outParams);
             Assert.Equal(expectedResult, validUrlResult);
         }
 

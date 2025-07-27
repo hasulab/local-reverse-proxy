@@ -1,5 +1,5 @@
 GET http://localhost:5000/api/values
-HTTP/1.1 200 OK
+Status-Code: HTTP/1.1 200 OK
 Content-Type: application/json
 
 [
