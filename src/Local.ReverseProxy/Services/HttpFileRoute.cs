@@ -13,7 +13,7 @@ namespace Local.ReverseProxy.Services
         public string Body { get; internal set; }
         public IReadOnlyDictionary<string,string> Headers { get; internal set; } = Defaults.EmptyString2Dictionary;
         public int StatusCode { get; set; }
-        public string[] UrlSegments { get; internal set; }
+        public IReadOnlyList<HttpFileUrlSegment> UrlSegments { get; internal set; }
         public string QueryString { get; internal set; }
         public IReadOnlyDictionary<string, string> QuerySegments { get; internal set; } = Defaults.EmptyString2Dictionary;
         
@@ -24,4 +24,5 @@ namespace Local.ReverseProxy.Services
                    $"{Body}";
         }
     }
+    public record HttpFileUrlSegment(string Segment, bool HasVariable);
 }

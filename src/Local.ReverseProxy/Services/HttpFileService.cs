@@ -109,8 +109,8 @@ namespace Local.ReverseProxy.Services
                             route.UrlHost = parsedUrl.host;
                             route.UrlPath = parsedUrl.path;
                             route.UrlValid = parsedUrl.isValid;
-                            route.UrlSegments = route.Url.Split('/');
                             route.QueryString = parsedUrl.query;
+                            route.UrlSegments = BuldUrlSegments(parsedUrl.path);
                             if (!string.IsNullOrEmpty(route.QueryString))
                             {
                                 route.QuerySegments = route.QueryString.Split('&')
@@ -204,6 +204,14 @@ namespace Local.ReverseProxy.Services
             }
         }
 
+        IReadOnlyList<HttpFileUrlSegment> BuldUrlSegments(string url)
+        {
+            var segments = url.Split('/')
+                .Select(segment => new HttpFileUrlSegment(segment, segment.StartsWith("{{") && segment.EndsWith("}}")))
+                .ToList();
+            return segments;
+        }
+
         public bool Exists([NotNullWhen(true)] string? path)
         {
             return _fileService.FileExists(path) || _fileService.DirectoryExists(path);
@@ -249,13 +257,14 @@ namespace Local.ReverseProxy.Services
                 return true;
 
             var urlSegments = path.Split('/');
+            var cachedSegments = httpFileRoute.UrlSegments;
 
-            if (httpFileRoute?.UrlSegments.Length == urlSegments.Length)
+            if (cachedSegments.Count == urlSegments.Length)
             {
                 bool isValid = true;
-                for (int i = 0; i < httpFileRoute.UrlSegments.Length; i++)
+                for (int i = 0; i < cachedSegments.Count; i++)
                 {
-                    if (httpFileRoute.UrlSegments[i] != urlSegments[i] && !httpFileRoute.UrlSegments[i].StartsWith("{{"))
+                    if (cachedSegments[i].Segment != urlSegments[i] && !cachedSegments[i].HasVariable)
                     {
                         isValid = false;
                         break;

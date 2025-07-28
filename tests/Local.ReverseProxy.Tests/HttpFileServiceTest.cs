@@ -66,6 +66,7 @@ namespace Local.ReverseProxy.Tests
         [Theory]
         //[InlineData("GET /test1\n \n{ \"message\":\"OK\" }\n###\nPOST /test2\n \n{ \"message\":\"OK\" }\n", 2)]
         [InlineData("GET", "http://example.com/test1?param=value", true)]
+        [InlineData("GET", "http://anyurl.com/test3/1?param=value", true)]
         public void ValidateUrlTest(string method, string url, bool expectedResult)
         {
             string[] urls = {
@@ -89,7 +90,7 @@ namespace Local.ReverseProxy.Tests
 
             moqFileService
                 .Setup(fs => fs.ReadAllTextAsync("testFile2.http", It.IsAny<CancellationToken>()))
-                .ReturnsAsync("GET /test3\nheader1:val1\n \n{ \"message\":\"OK\" }\n###\nPUT /test4\n \n{ \"message\":\"OK\" }\n");
+                .ReturnsAsync("GET http://anyurl.com/test3/{{paramId}}?param=value\nheader1:val1\n \n{ \"message\":\"OK\" }\n###\nPUT /test4\n \n{ \"message\":\"OK\" }\n");
             moqFileService.Setup(fs => fs.GetFileName(It.IsAny<string>()))
                 .Returns((string path) => Path.GetFileName(path));
             
