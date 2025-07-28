@@ -15,7 +15,7 @@ namespace Local.ReverseProxy.Services
         public int StatusCode { get; set; }
         public IReadOnlyList<HttpFileUrlSegment> UrlSegments { get; internal set; }
         public string QueryString { get; internal set; }
-        public IReadOnlyDictionary<string, string> QuerySegments { get; internal set; } = Defaults.EmptyString2Dictionary;
+        public IReadOnlyDictionary<string, HttpFileUrlSegment> QuerySegments { get; internal set; } = Defaults.EmptyStringHttpFileUrlSegmentDictionary;
         
         public override string ToString()
         {

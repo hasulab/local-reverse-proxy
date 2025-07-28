@@ -111,12 +111,7 @@ namespace Local.ReverseProxy.Services
                             route.UrlValid = parsedUrl.isValid;
                             route.QueryString = parsedUrl.query;
                             route.UrlSegments = BuldUrlSegments(parsedUrl.path);
-                            if (!string.IsNullOrEmpty(route.QueryString))
-                            {
-                                route.QuerySegments = route.QueryString.Split('&')
-                                    .Select(q => q.Split('='))
-                                    .ToDictionary(kv => kv[0], kv => kv.Length > 1 ? kv[1] : string.Empty, StringComparer.OrdinalIgnoreCase);
-                            }
+                            route.QuerySegments = BuildQueryStringSegements(parsedUrl.query);
                         }
                         else
                         {
@@ -217,6 +212,24 @@ namespace Local.ReverseProxy.Services
             return segments;
         }
 
+        IReadOnlyDictionary<string, HttpFileUrlSegment> BuildQueryStringSegements(string queryString)
+        {
+            if (string.IsNullOrEmpty(queryString))
+                return new Dictionary<string, HttpFileUrlSegment>(StringComparer.OrdinalIgnoreCase);
+
+            return queryString.Split('&')
+                .Select(q => q.Split('='))
+                .ToDictionary(kv => kv[0],
+                    kv =>
+                    {
+                        var kvValue = kv.Length > 1 ? kv[1] : string.Empty;
+                        var hasVariable = kv.Length > 1 && (kvValue.StartsWith("{{") && kvValue.EndsWith("}}"));
+                        var variableName = hasVariable ? kvValue[2..^2] : null; // Remove the {{ and }} if it's a variable
+                        return new HttpFileUrlSegment(kv[0], hasVariable, variableName);
+                    },
+                    StringComparer.OrdinalIgnoreCase);
+        }
+
         public bool Exists([NotNullWhen(true)] string? path)
         {
             return _fileService.FileExists(path) || _fileService.DirectoryExists(path);
@@ -247,8 +260,21 @@ namespace Local.ReverseProxy.Services
                     return true;
                 }
 
-                if (MatchPath(httpFileRoute, path, out var pathVariables) && MatchQueryString(httpFileRoute, queryString))
+                if (MatchPath(httpFileRoute, path, out var pathVariables) 
+                    && MatchQueryString(httpFileRoute, queryString, out var queryVariables))
                 {
+                    var allVariables = pathVariables != null || queryVariables != null ? new List<string>() : null;
+                    if (allVariables != null && pathVariables != null)
+                        allVariables.AddRange(pathVariables);
+                    if (allVariables != null && queryVariables != null)
+                        allVariables.AddRange(queryVariables);
+
+                    var pathVariablesDict = allVariables?.Select(pv => pv.Split('='))
+                        .Where(kv => kv.Length == 2)
+                        .ToDictionary(kv => kv[0], kv => kv[1], StringComparer.OrdinalIgnoreCase);
+
+                    outParams = pathVariablesDict?.AsReadOnly() ?? Defaults.EmptyString2Dictionary;
+                   
                     matchedRoute = httpFileRoute;
                     return true;
                 }
@@ -287,8 +313,9 @@ namespace Local.ReverseProxy.Services
             return false;
         }
 
-        private static bool MatchQueryString(HttpFileRoute httpFileRoute, string queryString)
+        private static bool MatchQueryString(HttpFileRoute httpFileRoute, string queryString, out List<string> paramValues)
         {
+            paramValues = null;
             if (httpFileRoute.QueryString == queryString)
                 return true;
 
@@ -306,10 +333,15 @@ namespace Local.ReverseProxy.Services
                 var querySegmentsArr = querySegments.ToArray();
                 for (int i = 0; i < cachedQuerySegments.Length; i++)
                 {
-                    if (cachedQuerySegments[i].Key != querySegmentsArr[i].Key && !cachedQuerySegments[i].Value.StartsWith("{{"))
+                    if (cachedQuerySegments[i].Key != querySegmentsArr[i].Key && !cachedQuerySegments[i].Value.HasVariable)
                     {
                         isValid = false;
                         break;
+                    }
+                    if (cachedQuerySegments[i].Value.HasVariable)
+                    {
+                        paramValues = paramValues ?? new List<string>();
+                        paramValues.Add($"{cachedQuerySegments[i].Value.VariableName}={querySegmentsArr[i].Value}");
                     }
                 }
                 if (isValid)
