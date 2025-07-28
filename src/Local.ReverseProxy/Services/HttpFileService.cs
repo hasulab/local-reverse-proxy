@@ -207,7 +207,12 @@ namespace Local.ReverseProxy.Services
         IReadOnlyList<HttpFileUrlSegment> BuldUrlSegments(string url)
         {
             var segments = url.Split('/')
-                .Select(segment => new HttpFileUrlSegment(segment, segment.StartsWith("{{") && segment.EndsWith("}}")))
+                .Select(segment =>
+                {
+                    bool hasVariable = segment.StartsWith("{{") && segment.EndsWith("}}");
+                    var variableName = hasVariable ? segment[2..^2] : null; // Remove the {{ and }} if it's a variable
+                    return new HttpFileUrlSegment(segment, hasVariable, variableName);
+                })
                 .ToList();
             return segments;
         }
@@ -242,7 +247,7 @@ namespace Local.ReverseProxy.Services
                     return true;
                 }
 
-                if (MatchPath(httpFileRoute, path) && MatchQueryString(httpFileRoute, queryString))
+                if (MatchPath(httpFileRoute, path, out var pathVariables) && MatchQueryString(httpFileRoute, queryString))
                 {
                     matchedRoute = httpFileRoute;
                     return true;
@@ -251,8 +256,9 @@ namespace Local.ReverseProxy.Services
             return false;
         }
 
-        private static bool MatchPath(HttpFileRoute httpFileRoute, string path)
+        private static bool MatchPath(HttpFileRoute httpFileRoute, string path, out List<string> paramValues)
         {
+            paramValues = null;
             if (httpFileRoute.UrlPath == path)
                 return true;
 
@@ -269,12 +275,18 @@ namespace Local.ReverseProxy.Services
                         isValid = false;
                         break;
                     }
+                    if (cachedSegments[i].HasVariable)
+                    {
+                        paramValues = paramValues ?? new List<string>();
+                        paramValues.Add($"{cachedSegments[i].VariableName}={urlSegments[i]}");
+                    }
                 }
                 if (isValid)
                     return true;
             }
             return false;
         }
+
         private static bool MatchQueryString(HttpFileRoute httpFileRoute, string queryString)
         {
             if (httpFileRoute.QueryString == queryString)
@@ -286,7 +298,6 @@ namespace Local.ReverseProxy.Services
             var querySegments = queryString.Split('&')
                 .Select(q => q.Split('='))
                 .ToDictionary(kv => kv[0], kv => kv.Length > 1 ? kv[1] : string.Empty, StringComparer.OrdinalIgnoreCase);
-
 
             if (httpFileRoute?.QuerySegments.Count == querySegments.Count)
             {

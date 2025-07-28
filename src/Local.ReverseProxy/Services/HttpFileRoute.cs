@@ -24,5 +24,5 @@ namespace Local.ReverseProxy.Services
                    $"{Body}";
         }
     }
-    public record HttpFileUrlSegment(string Segment, bool HasVariable);
+    public record HttpFileUrlSegment(string Segment, bool HasVariable, string VariableName = null);
 }
