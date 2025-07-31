@@ -1,6 +1,7 @@
 ﻿using Local.ReverseProxy.Services;
 using Microsoft.AspNetCore.Http;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace Local.ReverseProxy.Middlewares
 {
@@ -19,6 +20,7 @@ namespace Local.ReverseProxy.Middlewares
             _logger = logger;
         }
 
+        static readonly Regex placeholderRegex = new Regex(@"\{([a-zA-Z0-9_]+)\}");
         public async Task InvokeAsync(HttpContext context)
         {
             if (_httpFileService.ValidateUrl(context.Request, out HttpFileRoute matchedRoute, out var outParams))
@@ -65,12 +67,14 @@ namespace Local.ReverseProxy.Middlewares
                         var bodyText = matchedRoute.Body;
                         if (outParams != null && outParams.Any())
                         {
-                            var sbBody = new StringBuilder();
-                            foreach (var param in outParams)
+                            //var sbBody = new StringBuilder();
+                            //foreach (var param in outParams){ sbBody.Replace($"{{{{{param.Key}}}}}", param.Value);}
+                            //bodyText = sbBody.ToString();
+                            bodyText = placeholderRegex.Replace(matchedRoute.Body, match =>
                             {
-                                sbBody.Replace($"{{{{{param.Key}}}}}", param.Value);
-                            }
-                            bodyText = sbBody.ToString();
+                                var key = match.Groups[1].Value;
+                                return outParams.TryGetValue(key, out var value) ? value : match.Value;
+                            });
                         }
                         await context.Response.WriteAsync(bodyText);
                     }
