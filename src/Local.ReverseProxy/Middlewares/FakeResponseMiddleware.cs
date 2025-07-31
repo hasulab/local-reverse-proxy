@@ -1,5 +1,6 @@
 ﻿using Local.ReverseProxy.Services;
 using Microsoft.AspNetCore.Http;
+using System.Text;
 
 namespace Local.ReverseProxy.Middlewares
 {
@@ -59,7 +60,21 @@ namespace Local.ReverseProxy.Middlewares
                     {
                         context.Response.Headers[header.Key] = header.Value;
                     }
-                    await context.Response.WriteAsync(matchedRoute.Body);
+                    if (!string.IsNullOrEmpty(matchedRoute.Body))
+                    {
+                        var bodyText = matchedRoute.Body;
+                        if (outParams != null && outParams.Any())
+                        {
+                            var sbBody = new StringBuilder();
+                            foreach (var param in outParams)
+                            {
+                                sbBody.Replace($"{{{{{param.Key}}}}}", param.Value);
+                            }
+                            bodyText = sbBody.ToString();
+                        }
+                        await context.Response.WriteAsync(bodyText);
+                    }
+                    
                 }
                 catch (Exception ex)
                 {
