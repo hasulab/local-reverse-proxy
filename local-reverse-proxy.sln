@@ -23,6 +23,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{6FE931F5-E
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Local.ReverseProxy.Tests", "tests\Local.ReverseProxy.Tests\Local.ReverseProxy.Tests.csproj", "{950B081A-6ED0-4260-A1F0-B634745BA7F9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "WebApplication1", "src\WebApplication1\WebApplication1.csproj", "{F12FE2FC-E6CC-4EEE-A434-DD847A006602}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +43,10 @@ Global
 		{950B081A-6ED0-4260-A1F0-B634745BA7F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{950B081A-6ED0-4260-A1F0-B634745BA7F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{950B081A-6ED0-4260-A1F0-B634745BA7F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F12FE2FC-E6CC-4EEE-A434-DD847A006602}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F12FE2FC-E6CC-4EEE-A434-DD847A006602}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F12FE2FC-E6CC-4EEE-A434-DD847A006602}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F12FE2FC-E6CC-4EEE-A434-DD847A006602}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -49,6 +55,7 @@ Global
 		{9FEEC1F6-A56D-4DD6-887E-4782070D234A} = {BA737EB9-B48B-46F2-8133-86CC8454D4CC}
 		{5F70C7ED-922B-474F-BCF0-1080CAC43D80} = {7EA806B2-39CF-4C07-8F8E-CA456AB89B44}
 		{950B081A-6ED0-4260-A1F0-B634745BA7F9} = {6FE931F5-E3AE-4074-9523-240F5195F654}
+		{F12FE2FC-E6CC-4EEE-A434-DD847A006602} = {BA737EB9-B48B-46F2-8133-86CC8454D4CC}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {52286567-2ED9-481C-82B9-254D1BB55D1B}
